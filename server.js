@@ -27,28 +27,32 @@ app.post('/analizar-imagen', upload.single('imagen'), async (req, res) => {
         contents: [{
           parts: [
             { inline_data: { mime_type: mime, data: base64 } },
-            { text: `Eres experto en marketing de colchones en Colombia. Analiza esta imagen y genera en español:
-1. Un título llamativo para Instagram/Facebook (máximo 10 palabras)
-2. Una descripción con emojis y llamada a la acción (máximo 5 líneas)
-3. 10 hashtags relevantes
-
-Responde SOLO en este formato JSON:
-{"titulo":"...","descripcion":"...","hashtags":["#...","#..."]}` }
+            { text: `Eres experto en marketing de colchones en Colombia. Analiza esta imagen y responde UNICAMENTE con este JSON sin markdown ni explicaciones:
+{"titulo":"titulo llamativo maximo 10 palabras","descripcion":"descripcion con emojis y llamada a la accion maximo 5 lineas","hashtags":["#hashtag1","#hashtag2","#hashtag3","#hashtag4","#hashtag5","#hashtag6","#hashtag7","#hashtag8","#hashtag9","#hashtag10"]}` }
           ]
         }]
       })
     });
+
     const data = await response.json();
-    const text = data.candidates[0].content.parts[0].text;
-    const json = JSON.parse(text.replace(/```json|```/g, '').trim());
+    console.log('Gemini raw:', JSON.stringify(data));
+
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    console.log('Gemini text:', text);
+
+    // Limpiar y parsear
+    const clean = text.replace(/```json/g,'').replace(/```/g,'').trim();
+    const json = JSON.parse(clean);
+
     fs.unlinkSync(req.file.path);
     res.json(json);
   } catch (e) {
+    console.error('Error:', e.message);
     res.status(500).json({ error: e.message });
   }
 });
 
-// OBTENER PÁGINAS DE META
+// PÁGINAS META
 app.get('/paginas', async (req, res) => {
   try {
     const r = await fetch(`https://graph.facebook.com/v19.0/me/accounts?access_token=${META_TOKEN}`);
@@ -86,31 +90,6 @@ app.post('/publicar/facebook', upload.single('imagen'), async (req, res) => {
   }
 });
 
-// PUBLICAR EN INSTAGRAM
-app.post('/publicar/instagram', upload.single('imagen'), async (req, res) => {
-  try {
-    const { ig_id, page_token, mensaje, imagen_url } = req.body;
-    // Paso 1: crear contenedor
-    const r1 = await fetch(`https://graph.facebook.com/v19.0/${ig_id}/media`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ image_url: imagen_url, caption: mensaje, access_token: page_token })
-    });
-    const d1 = await r1.json();
-    if (!d1.id) { res.json({ error: 'Error creando contenedor', detalle: d1 }); return; }
-    // Paso 2: publicar
-    const r2 = await fetch(`https://graph.facebook.com/v19.0/${ig_id}/media_publish`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ creation_id: d1.id, access_token: page_token })
-    });
-    const d2 = await r2.json();
-    res.json(d2);
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
 // MÉTRICAS FACEBOOK
 app.get('/metricas/facebook/:page_id', async (req, res) => {
   try {
@@ -138,4 +117,4 @@ app.get('/metricas/instagram/:ig_id', async (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`MediaHub server corriendo en puerto ${PORT}`));
+app.listen(PORT, () => console.log(`MediaHub server en puerto ${PORT}`));
