@@ -42,8 +42,16 @@ app.post('/analizar-imagen', upload.single('imagen'), async (req, res) => {
 
     // Limpiar y parsear
     const clean = text.replace(/```json/g,'').replace(/```/g,'').trim();
-    const json = JSON.parse(clean);
-
+let json;
+try {
+  json = JSON.parse(clean);
+} catch {
+  json = {
+    titulo: "Error generando título",
+    descripcion: text,
+    hashtags: []
+  };
+}
     fs.unlinkSync(req.file.path);
     res.json(json);
   } catch (e) {
