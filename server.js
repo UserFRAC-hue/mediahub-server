@@ -146,5 +146,9 @@ app.get('/metricas/instagram/:ig_id', async (req, res) => {
   }
 });
 
+app.get('/test', (req, res) => {
+  res.json({ OR_KEY_existe: !!process.env.OR_KEY, primeros6: process.env.OR_KEY?.substring(0,6) });
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`MediaHub server en puerto ${PORT}`));
