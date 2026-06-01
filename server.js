@@ -11,9 +11,9 @@ app.use(express.json());
 const upload = multer({ dest: 'uploads/' });
 
 const META_TOKEN = process.env.META_TOKEN;
-const OR_KEY = process.env.GEMINI_KEY;
+const OR_KEY = process.env.OR_KEY;
 const OR_URL = 'https://openrouter.ai/api/v1/chat/completions';
-const OR_MODEL = 'google/gemini-2.0-flash-exp:free';
+const OR_MODEL = 'meta-llama/llama-3.2-11b-vision-instruct:free';
 
 async function llamarIA(messages) {
   const r = await fetch(OR_URL, {
