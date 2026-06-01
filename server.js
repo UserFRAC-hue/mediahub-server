@@ -11,51 +11,74 @@ app.use(express.json());
 const upload = multer({ dest: 'uploads/' });
 
 const META_TOKEN = process.env.META_TOKEN;
-const GEMINI_KEY = process.env.GEMINI_KEY;
+const OR_KEY = process.env.GEMINI_KEY;
+const OR_URL = 'https://openrouter.ai/api/v1/chat/completions';
+const OR_MODEL = 'meta-llama/llama-3.2-11b-vision-instruct:free';
 
-// ANALIZAR IMAGEN CON GEMINI
+async function llamarIA(messages) {
+  const r = await fetch(OR_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${OR_KEY}`
+    },
+    body: JSON.stringify({ model: OR_MODEL, messages })
+  });
+  const data = await r.json();
+  console.log('OpenRouter response:', JSON.stringify(data).substring(0, 300));
+  return data.choices?.[0]?.message?.content || '';
+}
+
+// ANALIZAR IMAGEN CON IA
 app.post('/analizar-imagen', upload.single('imagen'), async (req, res) => {
   try {
     const imageData = fs.readFileSync(req.file.path);
     const base64 = imageData.toString('base64');
     const mime = req.file.mimetype;
 
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_KEY}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{
-          parts: [
-            { inline_data: { mime_type: mime, data: base64 } },
-            { text: `Eres experto en marketing de colchones en Colombia. Analiza esta imagen y responde UNICAMENTE con este JSON sin markdown ni explicaciones:
-{"titulo":"titulo llamativo maximo 10 palabras","descripcion":"descripcion con emojis y llamada a la accion maximo 5 lineas","hashtags":["#hashtag1","#hashtag2","#hashtag3","#hashtag4","#hashtag5","#hashtag6","#hashtag7","#hashtag8","#hashtag9","#hashtag10"]}` }
-          ]
-        }]
-      })
-    });
+    const text = await llamarIA([{
+      role: 'user',
+      content: [
+        { type: 'image_url', image_url: { url: `data:${mime};base64,${base64}` } },
+        { type: 'text', text: `Eres experto en marketing de colchones en Colombia. Analiza esta imagen y responde UNICAMENTE con este JSON sin markdown: {"titulo":"titulo llamativo maximo 10 palabras","descripcion":"descripcion con emojis y llamada a la accion maximo 5 lineas","hashtags":["#hashtag1","#hashtag2","#hashtag3","#hashtag4","#hashtag5","#hashtag6","#hashtag7","#hashtag8","#hashtag9","#hashtag10"]}` }
+      ]
+    }]);
 
-    const data = await response.json();
-    console.log('Gemini raw:', JSON.stringify(data));
-
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-    console.log('Gemini text:', text);
-
-    // Limpiar y parsear
+    console.log('IA text:', text);
     const clean = text.replace(/```json/g,'').replace(/```/g,'').trim();
-let json;
-try {
-  json = JSON.parse(clean);
-} catch {
-  json = {
-    titulo: "Error generando título",
-    descripcion: text,
-    hashtags: []
-  };
-}
+    const json = JSON.parse(clean);
     fs.unlinkSync(req.file.path);
     res.json(json);
   } catch (e) {
-    console.error('Error:', e.message);
+    console.error('Error analizar-imagen:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// GENERAR COPY
+app.post('/generar-copy', async (req, res) => {
+  try {
+    const { empresa, red, tipo, detalle } = req.body;
+    const text = await llamarIA([{
+      role: 'user',
+      content: `Eres experto en marketing digital para marcas de colchones en Colombia. Genera un copy para ${red} para la marca "${empresa}". Tipo: ${tipo}. ${detalle ? 'Detalles: ' + detalle : ''} Español colombiano, con emojis, llamada a la accion, maximo 5 lineas. Solo el copy.`
+    }]);
+    res.json({ copy: text });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// GENERAR IDEAS
+app.post('/generar-ideas', async (req, res) => {
+  try {
+    const { empresa } = req.body;
+    const text = await llamarIA([{
+      role: 'user',
+      content: `5 ideas de contenido para redes sociales de "${empresa}" (colchones) para esta semana. Formato: emoji + tipo (post/historia/reel) + idea breve. Una por linea. Solo las ideas.`
+    }]);
+    res.json({ ideas: text });
+  } catch (e) {
     res.status(500).json({ error: e.message });
   }
 });
