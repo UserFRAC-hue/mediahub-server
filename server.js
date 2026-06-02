@@ -14,7 +14,7 @@ const META_TOKEN = process.env.META_TOKEN;
 const GROQ_KEY = process.env.GROQ_KEY;
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const GROQ_MODEL = 'llama-3.1-8b-instant';
-const GROQ_VISION = 'llama-3.2-11b-vision-preview';
+const GROQ_VISION = 'meta-llama/llama-4-scout-17b-16e-instruct';
 
 async function llamarIA(messages, vision) {
   const modelo = vision ? GROQ_VISION : GROQ_MODEL;
